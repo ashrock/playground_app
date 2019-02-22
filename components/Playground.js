@@ -46,6 +46,7 @@ class CardObj{
     }
 }
 
+/** turn-based, action count, unlimited zone, has combat phase, interactive, each card is a resource */
 class Playground extends Component<Props> {
     constructor(props){
         super(props);
@@ -55,7 +56,7 @@ class Playground extends Component<Props> {
         this.drawCards = this.drawCards.bind(this);
         this.discardCards = this.discardCards.bind(this);
         this.millCards = this.millCards.bind(this);
-        this.showHandTooltip = this.showHandTooltip.bind(this);
+        this.showTooltip = this.showTooltip.bind(this);
         this.addMana = this.addMana.bind(this);
         this.max_mana = 10;
 
@@ -64,6 +65,7 @@ class Playground extends Component<Props> {
             hand: [],
             discard_pile: [],
             playfield: [],
+            resources: [],
             card_details : null,
             card_details_dialog_visible: false,
             deck_dialog_visible: false,
@@ -74,6 +76,7 @@ class Playground extends Component<Props> {
                 draw: [],
             },
             mana:10,
+            action_count: 3,
         }
     }
 
@@ -84,7 +87,7 @@ class Playground extends Component<Props> {
 
     /** run if state.game_phase is updated */
     checkPhase(){
-        
+
     }
 
     registerAbilitiy(ability_obj){
@@ -237,6 +240,10 @@ class Playground extends Component<Props> {
         let currPlayfield = self.state.playfield;
         let playedCards = currHand.filter((currCard, index) => (index == card_index) );
         const playedCard = playedCards[0];
+
+        /** reset flags */
+        playedCard.tooltip_visible = false;
+
         currPlayfield.unshift(playedCard);
 
         let remainingCards = currHand.filter((currCard, index) => {
@@ -301,19 +308,21 @@ class Playground extends Component<Props> {
         });
     }
 
-    showHandTooltip(card_index){
+    showTooltip(zone, card_index){
         let self = this;
-        if(self.state.game_phase > 0)
+        let game_phases = ["","draw","play","pass"];
+
+        if(self.state.game_phase == game_phases.indexOf("play"))
         {
-            let currHand = self.state.hand.map((currCard) => {
+            let card_pile = self.state[ zone ].map((currCard) => {
                 currCard.tooltip_visible = false;
                 return currCard;
             });
+            let card_pile_state = {};
+            card_pile_state[ zone ] = card_pile;
 
-            self.setState({
-                hand : currHand
-            }, () => {
-                let newHand = self.state.hand.map((currCard, index) => {
+            self.setState(card_pile_state, () => {
+                let new_card_pile = self.state[ zone ].map((currCard, index) => {
                     if(index == card_index)
                     {
                         currCard.tooltip_visible = true;
@@ -321,9 +330,10 @@ class Playground extends Component<Props> {
                     return currCard;
                 });
 
-                self.setState({
-                    hand : newHand
-                });
+                let new_card_pile_obj = {};
+                new_card_pile_obj[ zone ] = new_card_pile;
+
+                self.setState(new_card_pile_obj);
             });
         }
     }
@@ -344,6 +354,10 @@ class Playground extends Component<Props> {
         return this.state.mana;
     }
 
+    getActionCount(){
+        return this.state.action_count;
+    }
+
     render() {
         let self = this
         let deck = (self.state.deck_ready) ? self.getDeck() : [];
@@ -351,8 +365,17 @@ class Playground extends Component<Props> {
         let discard_pile = self.getDiscardPile();
         let playfield = self.getPlayfield();
         let currentMana = self.getCurrentMana();
+        let action_count = self.getActionCount();
         let hand_ready = (hand.length == 0);
-        var {height, width} = Dimensions.get('window');
+        let {height, width} = Dimensions.get('window');
+        let card_left_margin = 0;
+        let total_hand_width = hand.length * (250/3);
+        if(total_hand_width > width)
+        {
+            card_left_margin = (width - total_hand_width) / hand.length;
+        }
+
+        let game_phases = ["","draw","play","pass"]
 
         return (
             <View style={{backgroundColor:`#607D8B`, flex:1, flexDirection:`column`}}>
@@ -365,7 +388,25 @@ class Playground extends Component<Props> {
                             </View>
                         ) : (
                             <View style={{flexDirection:`row`, alignContent:`stretch`, justifyContent:`space-between`}}>
-                                <Button style={{flex:1}} onPress={ () => self.drawCards(1) } title={`Draw 1`} />
+                                <Button style={{flex:1}}
+                                    onPress={ () => {
+                                        self.setState({ game_phase : 2}) /** move to Play Phase */
+                                        self.drawCards(1);
+                                    } }
+                                    title={`Draw 1`}
+                                    disabled={ (self.state.game_phase != game_phases.indexOf("draw")) } />
+                                <Button style={{flex:1}}
+                                    onPress={ () => {
+                                        self.setState({ game_phase : 3}) /** move to Pass Phase */
+                                    } }
+                                    title={`Done`}
+                                    disabled={ (self.state.game_phase != game_phases.indexOf("play")) } />
+                                <Button style={{flex:1}}
+                                    onPress={ () => {
+                                        self.setState({ game_phase : 1}) /** move to Draw Phase */
+                                    } }
+                                    title={`Pass Turn`}
+                                    disabled={ (self.state.game_phase != game_phases.indexOf("pass")) } />
                                 <Button style={{flex:1}} onPress={ () => self.addMana(1) } title={`Add 1 Mana`} />
                             </View>
                         )
@@ -445,15 +486,20 @@ class Playground extends Component<Props> {
                             let tooltip_height = 50;
                             return (
                                 <View
-                                    key={index}>
+                                    style={{
+                                        marginLeft: (index == 0) ? 0 : card_left_margin,
+                                        overflow: `visible`,
+                                    }}
+                                    key={index}
+                                    >
                                     {
                                         /** Card Tooltip */
                                         ( item.tooltip_visible ) ? (
                                             <View style={{
                                                 width:`100%`,
                                                 height: tooltip_height,
-                                                position:`absolute`,
                                                 padding: 5,
+                                                position:`absolute`,
                                                 paddingHorizontal: 10,
                                                 borderRadius: 5,
                                                 backgroundColor:'rgba(0,0,0,0.25)',
@@ -467,7 +513,7 @@ class Playground extends Component<Props> {
                                                     >Discard</Text>
                                                 </TouchableOpacity>
                                             {
-                                                (currentMana < item.cost) ? null : (
+                                                (action_count != 0 && currentMana < item.cost) ? null : (
                                                     <TouchableOpacity onPress={()=>{
                                                         self.playCard( index );
                                                     }}>
@@ -477,11 +523,22 @@ class Playground extends Component<Props> {
                                                     </TouchableOpacity>
                                                 )
                                             }
+                                            {
+                                                (action_count != 0) ? null : (
+                                                    <TouchableOpacity onPress={()=>{
+                                                        self.playCard( index );
+                                                    }}>
+                                                        <Text
+                                                            style={[{fontWeight:`bold`, color:`#fff`}]}
+                                                        >Play as Resource</Text>
+                                                    </TouchableOpacity>
+                                                )
+                                            }
                                             </View>
                                         ) : null
                                     }
                                     <TouchableOpacity
-                                        onPress={()=> {self.showHandTooltip(index)} }
+                                        onPress={()=> {self.showTooltip("hand", index)} }
                                         onLongPress={()=>{
                                             self.setState({
                                                 card_details_dialog_visible : true,
@@ -491,7 +548,7 @@ class Playground extends Component<Props> {
                                         style={[
                                             {
                                                 marginTop: tooltip_height,
-                                                opacity: (currentMana >= item.cost) ? 1 : 0.75,
+                                                opacity: (currentMana >= item.cost) ? 1 : 0.661,
                                             },
                                             (self.state.tooltip_expanded == false) ? {position:`absolute`} : null,
                                         ]}
