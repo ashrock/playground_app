@@ -32,8 +32,16 @@ class CardObj{
         this.cost = Math.floor(Math.random()*3) + 1;
         this.health = (this.type != 0) ? null : Math.floor(Math.random()*2) + 1;
         this.power = (this.type != 0) ? null : Math.floor(Math.random()*2);
-        this.ability = random_abilities[Math.floor(Math.random()*3)];
-        this.ability_targets = Math.floor(Math.random()*3) + 1;
+
+        /** ability_obj */
+        let abilities = [];
+        let ability_obj = {
+            text: random_abilities[Math.floor(Math.random()*3)],
+            value : Math.floor(Math.random()*3) + 1,
+        }
+        abilities.push(ability_obj);
+
+        this.abilities = abilities;
         this.status = true;
     }
 }
@@ -52,14 +60,19 @@ class Playground extends Component<Props> {
         this.max_mana = 10;
 
         this.state={
-            expanded: true,
             deck_ready : false,
             hand: [],
             discard_pile: [],
             playfield: [],
             card_details : null,
             card_details_dialog_visible: false,
+            deck_dialog_visible: false,
+            discard_pile_dialog_visible: false,
             game_phase: 0,
+            registered_abilities: {
+                upkeep: [],
+                draw: [],
+            },
             mana:10,
         }
     }
@@ -67,6 +80,19 @@ class Playground extends Component<Props> {
     componentDidMount(){
         let self = this;
         self.generateDeck();
+    }
+
+    /** run if state.game_phase is updated */
+    checkPhase(){
+        
+    }
+
+    registerAbilitiy(ability_obj){
+
+    }
+
+    unregisterAbilitiy(ability_obj){
+
     }
 
     async generateDeck(){
@@ -236,7 +262,11 @@ class Playground extends Component<Props> {
                 if(playedCard.type == 1)
                 {
                     /** play card ability */
-                    self[playedCard.ability](playedCard.ability_targets);
+                    for(let itr in playedCard.abilities)
+                    {
+                        let ability = playedCard.abilities[itr];
+                        self[ ability.text ]( ability.value );
+                    }
 
                     currPlayfield[0].status = false;
                 }
@@ -463,7 +493,7 @@ class Playground extends Component<Props> {
                                                 marginTop: tooltip_height,
                                                 opacity: (currentMana >= item.cost) ? 1 : 0.75,
                                             },
-                                            (self.state.expanded == false) ? {position:`absolute`} : null,
+                                            (self.state.tooltip_expanded == false) ? {position:`absolute`} : null,
                                         ]}
                                     >
                                         <Card attributes={{...item}}/>

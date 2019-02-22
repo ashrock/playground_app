@@ -30,6 +30,13 @@ export default class Card extends Component<Props> {
         return this.attributes;
     }
 
+    getCardAbilities(abilities)
+    {
+        return abilities.map((ability, key) =>
+            (<Text key={key} >{ capitalizeFirstLetter(ability.text) +" ("+ ability.value +")" }</Text>)
+        );
+    }
+
     render() {
         let self = this;
         let attributes = self.getCardAttributes();
@@ -49,9 +56,7 @@ export default class Card extends Component<Props> {
                 <View style={{paddingHorizontal:10}}>
                     <Text >{ attributes.name }</Text>
                     {
-                        (attributes.type != 1) ? null : (
-                            <Text >{ capitalizeFirstLetter(attributes.ability) +" ("+ attributes.ability_targets +")" }</Text>
-                        )
+                        (attributes.type != 1) ? null : self.getCardAbilities(attributes.abilities)
                     }
                     {/* <Text>{ capitalizeFirstLetter( card_types[ parseInt(attributes.type) ] ) }</Text> */}
                 </View>
