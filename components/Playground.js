@@ -9,10 +9,13 @@ import {
     ScrollView,
     Dimensions,
     Button,
+    UIManager,
+    findNodeHandle,
 } from 'react-native';
 import {adj, noun, card_types, capitalizeFirstLetter, } from './Data';
 import Dialog from "react-native-dialog";
 import Card from './Card';
+import CardGestureComponent from './CardGestureComponent';
 
 const instructions = Platform.select({
     ios: 'Press Cmd+R to reload,\n' + 'Cmd+D or shake for dev menu',
@@ -59,6 +62,8 @@ class Playground extends Component<Props> {
         this.showTooltip = this.showTooltip.bind(this);
         this.addMana = this.addMana.bind(this);
         this.max_mana = 10;
+        this.card_width = 250;
+        this.card_height = 350;
 
         this.state={
             deck_ready : false,
@@ -75,8 +80,9 @@ class Playground extends Component<Props> {
                 upkeep: [],
                 draw: [],
             },
-            mana:10,
+            mana:0,
             action_count: 3,
+            playfield_layout: {},
         }
     }
 
@@ -148,7 +154,11 @@ class Playground extends Component<Props> {
             self.deck = currDeck;
             currHand = currHand.concat(tmp_cards);
             self.setState({
-                hand : currHand
+                hand : []
+            }, ()=>{
+                self.setState({
+                    hand : currHand
+                });
             });
         }
     }
@@ -369,7 +379,7 @@ class Playground extends Component<Props> {
         let hand_ready = (hand.length == 0);
         let {height, width} = Dimensions.get('window');
         let card_left_margin = 0;
-        let total_hand_width = hand.length * (250/3);
+        let total_hand_width = hand.length * (self.card_width/3);
         if(total_hand_width > width)
         {
             card_left_margin = (width - total_hand_width) / hand.length;
@@ -390,8 +400,9 @@ class Playground extends Component<Props> {
                             <View style={{flexDirection:`row`, alignContent:`stretch`, justifyContent:`space-between`}}>
                                 <Button style={{flex:1}}
                                     onPress={ () => {
-                                        self.setState({ game_phase : 2}) /** move to Play Phase */
+                                        self.addMana(1);
                                         self.drawCards(1);
+                                        self.setState({ game_phase : 2}) /** move to Play Phase */
                                     } }
                                     title={`Draw 1`}
                                     disabled={ (self.state.game_phase != game_phases.indexOf("draw")) } />
@@ -416,32 +427,33 @@ class Playground extends Component<Props> {
                 <View
                     style={{
                         flexDirection:`row`,
-                        height:350/2,
+                        // height: self.card_height/2,
                         justifyContent:`space-around`,
                         marginVertical: 20,
                     }}>
-                    <View
-                        style={{
-                            width:250/2,
-                            height:350/2,
-                            backgroundColor:`#93CEA8`,
-                            overflow:'hidden',
-                        }}
-                    >
-                        <Text style={{
-                            textAlign:'center'
-                        }}>{deck.length}</Text>
-                    </View>
+                    <Text style={{
+                        textAlign:'center',
+                        fontWeight: `bold`
+                    }}>Deck ({deck.length})</Text>
 
-                    <Text>Mana ({ self.state.mana })</Text>
+                    <Text style={{
+                        textAlign:'center',
+                        fontWeight: `bold`
+                    }}>Mana ({ self.state.mana })</Text>
 
                     <TouchableOpacity
                         onPress={()=>{
                             self.setState({
                                 discard_pile_dialog_visible : true,
                             })
+                        }}
+                        style={{
+                            borderBottomWeight: 1,
                         }}>
-                        <Text>Discard Pile ({ discard_pile.length })</Text>
+                        <Text style={{
+                            textAlign:'center',
+                            fontWeight: `bold`,
+                        }}>Discard Pile ({ discard_pile.length })</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -449,14 +461,20 @@ class Playground extends Component<Props> {
                 <View
                     style={{
                         flexDirection:`row`,
-                        height:350/3,
+                        height: self.card_height/3,
                         justifyContent:`space-around`,
                         marginBottom: 20,
-                    }}>
+                    }}
+                    onLayout={({ nativeEvent}) => {
+                        self.setState({
+                            playfield_layout: nativeEvent.layout
+                        })
+                    }}
+                    >
                     <ScrollView
                         style={{
-                            width:250/3,
-                            height:350/3,
+                            width: self.card_width/3,
+                            height: self.card_height/3,
                             backgroundColor:`#00BFA5`,
                         }}
                         horizontal={true}
@@ -468,7 +486,7 @@ class Playground extends Component<Props> {
                                             style={[
                                             ]}
                                         >
-                                            <Card attributes={{...item}}/>
+                                            <Card attributes={{...item}} width={ self.card_width } height={ self.card_height }/>
                                         </TouchableOpacity>
                                     </View>;
                             }) : null
@@ -483,7 +501,7 @@ class Playground extends Component<Props> {
                 >
                     {
                         (hand.length > 0) ? hand.map((item, index) => {
-                            let tooltip_height = 50;
+                            let tooltip_height = 80;
                             return (
                                 <View
                                     style={{
@@ -504,14 +522,6 @@ class Playground extends Component<Props> {
                                                 borderRadius: 5,
                                                 backgroundColor:'rgba(0,0,0,0.25)',
                                             }} >
-                                                <TouchableOpacity
-                                                    onPress={()=>{
-                                                        self.discardCards( 1, index );
-                                                    }}>
-                                                    <Text
-                                                        style={[{fontWeight:`bold`, color:`#fff`}]}
-                                                    >Discard</Text>
-                                                </TouchableOpacity>
                                             {
                                                 (action_count != 0 && currentMana < item.cost) ? null : (
                                                     <TouchableOpacity onPress={()=>{
@@ -524,7 +534,7 @@ class Playground extends Component<Props> {
                                                 )
                                             }
                                             {
-                                                (action_count != 0) ? null : (
+                                                (action_count == 0) ? null : (
                                                     <TouchableOpacity onPress={()=>{
                                                         self.playCard( index );
                                                     }}>
@@ -534,6 +544,14 @@ class Playground extends Component<Props> {
                                                     </TouchableOpacity>
                                                 )
                                             }
+                                                <TouchableOpacity
+                                                    onPress={()=>{
+                                                        self.discardCards( 1, index );
+                                                    }}>
+                                                    <Text
+                                                        style={[{fontWeight:`bold`, color:`#fff`}]}
+                                                    >Discard</Text>
+                                                </TouchableOpacity>
                                             </View>
                                         ) : null
                                     }
@@ -553,14 +571,18 @@ class Playground extends Component<Props> {
                                             (self.state.tooltip_expanded == false) ? {position:`absolute`} : null,
                                         ]}
                                     >
-                                        <Card attributes={{...item}}/>
+                                        <Card attributes={{...item}} width={ self.card_width } height={ self.card_height }/>
                                     </TouchableOpacity>
                                 </View>
                                 );
                         }) : null
                     }
                 </ScrollView>
-
+                <CardGestureComponent onMove={(relativeCoordinates) => {
+                        // alert(JSON.stringify(relativeCoordinates));
+                    }}>
+                        <Text>Drag me</Text>
+                    </CardGestureComponent>
                 <Dialog.Container
                     visible={self.state.card_details_dialog_visible}
                     contentStyle={{ overflow:'visible', height:( height * .75)}}
@@ -596,7 +618,7 @@ class Playground extends Component<Props> {
                                             },
                                             ]}
                                         >
-                                            <Card attributes={{...item}}/>
+                                            <Card attributes={{...item}} width={ self.card_width } height={ self.card_height }/>
                                         </TouchableOpacity>
                                     </View>;
                             }) : null
